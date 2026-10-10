@@ -1,3 +1,15 @@
+## 3.3.2 — Editorially aware continuity QA (2026-10-10)
+
+### Added
+- `ShotNode.editorialIntent` to declare intentional `cross_cut`, `time_jump`, `montage`, `match_cut` and `axis_break` transitions.
+- Continuity rules respect declared editorial intent to reduce false positives on planned discontinuities.
+- Regression tests cover accidental continuity breaks, time jumps, match cuts, cross-cuts and preservation of the Feasibility Veto.
+
+### Guardrails
+- `continuity` remains the default when no editorial intent is provided.
+- Feasibility Veto findings remain active regardless of editorial intent.
+- Continuity checks remain deterministic and depend on explicitly structured shot metadata.
+
 ## 3.3.1 — Optical Intelligence (2026-10-10)
 
 ### Added

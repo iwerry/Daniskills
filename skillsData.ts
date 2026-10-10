@@ -768,6 +768,8 @@ export interface ShotNode {
   wardrobe?: Record<string, string>; prop_state?: Record<string, string>; micro_acting?: boolean;
   /** Explicit editorial intent prevents continuity QA from treating designed discontinuities as accidental errors. */
   editorialIntent?: 'continuity' | 'cross_cut' | 'time_jump' | 'montage' | 'match_cut' | 'axis_break';
+  /** Explicit causal evidence for a prop-state change introduced by this shot. */
+  propTransitions?: { prop: string; from: string; to: string; cause: string; beat?: string }[];
 }
 export interface ContinuityIssue { level: 'CRITICAL' | 'WARNING'; check: string; between: [string, string]; message: string }
 export function continuityCheck(a: ShotNode, b: ShotNode): ContinuityIssue[] {
@@ -801,7 +803,22 @@ export function continuityCheck(a: ShotNode, b: ShotNode): ContinuityIssue[] {
     if (sameLoc && a.weather && b.weather && a.weather !== b.weather) out.push({ level: 'WARNING', check: 'weather', between, message: `${a.weather} → ${b.weather}` });
     for (const p of (a.props ?? []).filter(p => (b.props ?? []).includes(p))) {
       const sa = a.prop_state?.[p], sb = b.prop_state?.[p];
-      if (sa && sb && sa !== sb) out.push({ level: 'WARNING', check: 'prop position and state', between, message: `${p}: ${sa} → ${sb}` });
+      if (sa && sb && sa !== sb) {
+        const transition = b.propTransitions?.find(t =>
+          t.prop === p && t.from === sa && t.to === sb && t.cause.trim().length > 0
+        );
+        if (transition) {
+          // A structured cause is sufficient to explain the state delta; a beat is recommended for production traceability.
+          if (!transition.beat?.trim()) out.push({
+            level: 'WARNING', check: 'causal traceability',
+            between, message: `${p}: state change is explained by "${transition.cause}", but no acting beat is linked`
+          });
+        } else {
+          out.push({ level: 'WARNING', check: 'prop position and state', between, message: `${p}: ${sa} → ${sb}` });
+          out.push({ level: 'WARNING', check: 'unexplained state transition', between,
+            message: `${p}: ${sa} → ${sb} has no matching propTransitions entry with a non-empty cause` });
+        }
+      }
     }
   }
   if (!matchCut && a.fov_degrees && b.fov_degrees && Math.abs(a.fov_degrees - b.fov_degrees) < 12 &&

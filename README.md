@@ -438,3 +438,16 @@ Catalog families include Cooke S8/i, ARRI Signature Prime, ZEISS Supreme Prime, 
 The resolver deliberately distinguishes *format-plausible* from verified mount/image-circle compatibility. Lens families are reference-level data; verify exact SKU, mount, T-stop, minimum focus, breathing, distortion and anamorphic squeeze ratio before using a real camera package. AI model equipment names are semantic cues, not guarantees of physically faithful optics.
 
 See [OPTICAL_INTELLIGENCE.md](./OPTICAL_INTELLIGENCE.md) for the schema, decision rules and tests.
+
+
+## 🎞️ State Ledger per sequence
+
+`buildStateLedger(shots)` returns ordered per-shot prop snapshots and deterministic findings for unexplained state deltas, mismatched transition origins/destinations, undeclared props, missing causes and missing acting-beat links. `AssetGraph.stateLedger()` exposes the same ledger from the graph's insertion-ordered shots. The ledger reads only structured `props`, `prop_state` and `propTransitions`; it does not infer unseen actions. Declared `time_jump` and `montage` cuts do not require adjacent prop-state continuity, while malformed explicit transition records remain reportable.
+
+```ts
+import { AssetGraph, buildStateLedger } from './skillsData';
+const ledger = buildStateLedger(sequenceShots);
+const graphLedger = new AssetGraph().add(...sequenceShots).stateLedger();
+// ledger.snapshots: [{ shotId, props }]
+// ledger.findings: stable codes + shot/prop IDs + expected/actual state
+```

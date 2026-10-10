@@ -831,6 +831,87 @@ export function continuityCheck(a: ShotNode, b: ShotNode): ContinuityIssue[] {
   return out;
 }
 export function sequenceContinuity(shots: ShotNode[]) { return shots.slice(1).flatMap((s, i) => continuityCheck(shots[i], s)); }
+
+export interface StateLedgerSnapshot {
+  shotId: string;
+  props: Record<string, string>;
+}
+export interface StateLedgerFinding {
+  level: 'WARNING' | 'CRITICAL';
+  code: 'STATE_LEDGER_UNEXPLAINED_CHANGE' | 'STATE_LEDGER_FROM_MISMATCH' | 'STATE_LEDGER_TO_MISMATCH' | 'STATE_LEDGER_PROP_UNDECLARED' | 'STATE_LEDGER_CAUSE_MISSING' | 'STATE_LEDGER_BEAT_MISSING';
+  shotId: string;
+  previousShotId?: string;
+  prop: string;
+  expected?: string;
+  actual?: string;
+  message: string;
+}
+export interface StateLedgerResult {
+  snapshots: StateLedgerSnapshot[];
+  findings: StateLedgerFinding[];
+}
+
+/**
+ * Deterministic per-sequence prop-state ledger. It validates only explicit prop_state
+ * and propTransitions metadata; it never infers off-screen actions or custody.
+ * Declared time jumps/montages do not require state continuity across the cut.
+ */
+export function buildStateLedger(shots: ShotNode[]): StateLedgerResult {
+  const snapshots: StateLedgerSnapshot[] = shots.map(shot => ({
+    shotId: shot.id,
+    props: Object.fromEntries(Object.entries(shot.prop_state ?? {}).sort(([a], [b]) => a.localeCompare(b)))
+  }));
+  const findings: StateLedgerFinding[] = [];
+  const add = (finding: StateLedgerFinding) => findings.push(finding);
+
+  shots.forEach((shot, index) => {
+    const previous = shots[index - 1];
+    const previousState = previous?.prop_state ?? {};
+    const currentState = shot.prop_state ?? {};
+    const intent = shot.editorialIntent ?? previous?.editorialIntent ?? 'continuity';
+    const discontinuity = intent === 'time_jump' || intent === 'montage';
+    const transitions = shot.propTransitions ?? [];
+
+    for (const transition of transitions) {
+      if (!(shot.props ?? []).includes(transition.prop) && !(transition.prop in currentState)) {
+        add({ level: 'WARNING', code: 'STATE_LEDGER_PROP_UNDECLARED', shotId: shot.id, previousShotId: previous?.id,
+          prop: transition.prop, message: `${transition.prop}: transition references a prop absent from this shot's props and prop_state metadata` });
+      }
+      if (previous && !discontinuity && transition.prop in previousState && previousState[transition.prop] !== transition.from) {
+        add({ level: 'WARNING', code: 'STATE_LEDGER_FROM_MISMATCH', shotId: shot.id, previousShotId: previous.id,
+          prop: transition.prop, expected: previousState[transition.prop], actual: transition.from,
+          message: `${transition.prop}: transition starts at "${transition.from}", previous shot records "${previousState[transition.prop]}"` });
+      }
+      if (transition.prop in currentState && currentState[transition.prop] !== transition.to) {
+        add({ level: 'WARNING', code: 'STATE_LEDGER_TO_MISMATCH', shotId: shot.id, previousShotId: previous?.id,
+          prop: transition.prop, expected: currentState[transition.prop], actual: transition.to,
+          message: `${transition.prop}: transition ends at "${transition.to}", incoming shot records "${currentState[transition.prop]}"` });
+      }
+      if (!transition.cause?.trim()) {
+        add({ level: 'WARNING', code: 'STATE_LEDGER_CAUSE_MISSING', shotId: shot.id, previousShotId: previous?.id,
+          prop: transition.prop, message: `${transition.prop}: transition has no causal explanation` });
+      } else if (!transition.beat?.trim()) {
+        add({ level: 'WARNING', code: 'STATE_LEDGER_BEAT_MISSING', shotId: shot.id, previousShotId: previous?.id,
+          prop: transition.prop, message: `${transition.prop}: causal explanation has no linked acting beat` });
+      }
+    }
+
+    if (!previous || discontinuity) return;
+    const sharedProps = (previous.props ?? []).filter(prop => (shot.props ?? []).includes(prop));
+    for (const prop of sharedProps) {
+      const from = previousState[prop], to = currentState[prop];
+      if (!from || !to || from === to) continue;
+      const transition = transitions.find(t => t.prop === prop && t.from === from && t.to === to && t.cause?.trim());
+      if (!transition) add({
+        level: 'WARNING', code: 'STATE_LEDGER_UNEXPLAINED_CHANGE', shotId: shot.id, previousShotId: previous.id,
+        prop, expected: from, actual: to,
+        message: `${prop}: state changes "${from}" → "${to}" without a matching causal transition`
+      });
+    }
+  });
+
+  return { snapshots, findings };
+}
 export class AssetGraph {
   private shots = new Map<string, ShotNode>();
   add(...ss: ShotNode[]) { ss.forEach(s => this.shots.set(s.id, s)); return this; }
@@ -838,6 +919,8 @@ export class AssetGraph {
     const all = [...this.shots.values()]; const u = (a: (string | undefined)[]) => [...new Set(a.filter((x): x is string => !!x))].sort();
     return { characters: u(all.flatMap(s => s.characters)), locations: u(all.map(s => s.location)), props: u(all.flatMap(s => s.props ?? [])), styles: u(all.map(s => s.style)) };
   }
+  /** Build a state ledger from the graph's shots in insertion order. */
+  stateLedger(): StateLedgerResult { return buildStateLedger([...this.shots.values()]); }
   /** "If I change X, which shots must be regenerated?" */
   impactOf(asset: string): string[] {
     return [...this.shots.values()].filter(s => s.characters.includes(asset) || s.location === asset || (s.props ?? []).includes(asset) || s.style === asset || s.engine === asset).map(s => s.id).sort();

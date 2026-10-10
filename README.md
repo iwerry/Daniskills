@@ -367,6 +367,30 @@ Idea, architecture and creative content: all rights reserved to the author. Cont
 </div>
 
 
+## 🎞️ Sequence continuity QA
+
+`continuityCheck(a, b)` and `sequenceContinuity(shots)` compare adjacent shots using structured facts: camera axis, screen direction, wardrobe, lighting, time, weather, prop state and focal relationship. Findings are deterministic warnings, not semantic interpretation of the edit.
+
+Declare `ShotNode.editorialIntent` when a discontinuity is deliberate:
+- `continuity` (default): run all applicable continuity checks.
+- `cross_cut`: skip axis and screen-direction checks across the cut.
+- `time_jump`: allow wardrobe, lighting, time, weather and prop-state changes.
+- `montage`: suppress those continuity warnings for an intentionally discontinuous montage.
+- `match_cut`: do not flag a repeated focal relationship as a jump-cut risk.
+- `axis_break`: allow a deliberate axis/screen-direction crossing.
+
+The Feasibility Veto remains active regardless of editorial intent. Use explicit intent only when the cut is designed that way; the tool cannot infer editorial meaning from shot descriptions.
+
+```ts
+const issues = sequenceContinuity([
+  { id: 'A', characters: ['Mara'], location: 'warehouse', axis: 'north', screen_direction: 'left' },
+  { id: 'B', characters: ['Mara'], location: 'warehouse', axis: 'south', screen_direction: 'right',
+    editorialIntent: 'axis_break' }
+]);
+```
+
+---
+ 
 ## 🔭 Optical Intelligence (new in 3.3)
 
 Daniskills now includes a structured lens-family catalog and a deterministic optical resolver in `opticsCatalog.ts`. Resolve shot intent, focal length, sensor format, lens family, aperture notation, depth of field and movement into prompt-ready optical language:

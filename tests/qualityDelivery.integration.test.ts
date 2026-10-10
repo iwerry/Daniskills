@@ -7,6 +7,8 @@ import {
   compileShotForDelivery,
   continuityCheck,
   sequenceContinuity,
+  buildStateLedger,
+  AssetGraph,
   validateShotTiming
 } from '../skillsData';
 
@@ -67,6 +69,41 @@ describe('sequence continuity editorial intent', () => {
     expect(issues.some(issue => issue.check === 'unexplained state transition')).toBe(false);
     expect(issues.some(issue => issue.check === 'causal traceability')).toBe(false);
     expect(issues.some(issue => issue.check === 'prop position and state')).toBe(false);
+  });
+
+
+  it('builds ordered state snapshots and identifies unexplained state changes', () => {
+    const shotB = { ...shotA, id: 'B', prop_state: { case: 'open' } };
+    const ledger = buildStateLedger([shotA, shotB]);
+    expect(ledger.snapshots).toEqual([
+      { shotId: 'A', props: { case: 'closed' } },
+      { shotId: 'B', props: { case: 'open' } }
+    ]);
+    expect(ledger.findings.some(f => f.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE' && f.prop === 'case')).toBe(true);
+  });
+
+  it('reports from/to state mismatches in explicit transitions', () => {
+    const shotB = {
+      ...shotA, id: 'B', prop_state: { case: 'ajar' },
+      propTransitions: [{ prop: 'case', from: 'locked', to: 'open', cause: 'Mara opens the latch', beat: '00:02 Mara lifts the lid' }]
+    };
+    const ledger = buildStateLedger([shotA, shotB]);
+    expect(ledger.findings.some(f => f.code === 'STATE_LEDGER_FROM_MISMATCH')).toBe(true);
+    expect(ledger.findings.some(f => f.code === 'STATE_LEDGER_TO_MISMATCH')).toBe(true);
+  });
+
+  it('does not require state continuity across declared time jumps', () => {
+    const shotB = {
+      ...shotA, id: 'B', prop_state: { case: 'open' }, editorialIntent: 'time_jump' as const
+    };
+    const ledger = buildStateLedger([shotA, shotB]);
+    expect(ledger.findings.some(f => f.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE')).toBe(false);
+  });
+
+  it('exposes the same deterministic ledger through AssetGraph', () => {
+    const shotB = { ...shotA, id: 'B', prop_state: { case: 'open' } };
+    const graph = new AssetGraph().add(shotA, shotB);
+    expect(graph.stateLedger()).toEqual(buildStateLedger([shotA, shotB]));
   });
 
   it('honors declared cross-cuts and axis breaks without suppressing feasibility vetoes', () => {

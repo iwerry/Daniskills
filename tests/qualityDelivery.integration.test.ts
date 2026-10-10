@@ -5,6 +5,8 @@ import {
   compilePromptForDelivery,
   compileShot,
   compileShotForDelivery,
+  continuityCheck,
+  sequenceContinuity,
   validateShotTiming
 } from '../skillsData';
 
@@ -16,6 +18,53 @@ const minimalShot = {
   camera: { fov_degrees: 47 },
   lighting: 'light'
 };
+
+describe('sequence continuity editorial intent', () => {
+  const shotA = {
+    id: 'A', characters: ['Mara'], location: 'warehouse', props: ['case'],
+    fov_degrees: 47, axis: 'north', screen_direction: 'left' as const,
+    time: 'night', wardrobe: { Mara: 'dark coat' }, prop_state: { case: 'closed' }
+  };
+
+  it('flags axis, screen direction, wardrobe and prop-state discontinuities by default', () => {
+    const shotB = {
+      ...shotA, id: 'B', axis: 'south', screen_direction: 'right' as const,
+      wardrobe: { Mara: 'white shirt' }, prop_state: { case: 'open' }
+    };
+    const issues = continuityCheck(shotA, shotB);
+    expect(issues.some(issue => issue.check === '180-degree rule / camera axis')).toBe(true);
+    expect(issues.some(issue => issue.check === 'screen direction')).toBe(true);
+    expect(issues.some(issue => issue.check === 'wardrobe' && issue.level === 'CRITICAL')).toBe(true);
+    expect(issues.some(issue => issue.check === 'prop position and state')).toBe(true);
+    expect(sequenceContinuity([shotA, shotB])).toHaveLength(issues.length);
+  });
+
+  it('honors declared cross-cuts and axis breaks without suppressing feasibility vetoes', () => {
+    const shotB = {
+      ...shotA, id: 'B', axis: 'south', screen_direction: 'right' as const,
+      editorialIntent: 'cross_cut' as const, micro_acting: true, fov_degrees: 100
+    };
+    const issues = continuityCheck(shotA, shotB);
+    expect(issues.some(issue => issue.check === '180-degree rule / camera axis')).toBe(false);
+    expect(issues.some(issue => issue.check === 'screen direction')).toBe(false);
+    expect(issues.some(issue => issue.check === 'Feasibility Veto')).toBe(true);
+  });
+
+  it('allows a declared time jump to change wardrobe and time of day', () => {
+    const shotB = {
+      ...shotA, id: 'B', time: 'dawn', wardrobe: { Mara: 'linen jacket' },
+      editorialIntent: 'time_jump' as const
+    };
+    const issues = continuityCheck(shotA, shotB);
+    expect(issues.some(issue => issue.check === 'wardrobe')).toBe(false);
+    expect(issues.some(issue => issue.check === 'time of day')).toBe(false);
+  });
+
+  it('treats a match cut as intentional even when focal relationship repeats', () => {
+    const shotB = { ...shotA, id: 'B', editorialIntent: 'match_cut' as const };
+    expect(continuityCheck(shotA, shotB).some(issue => issue.check === 'focal relationship')).toBe(false);
+  });
+});
 
 describe('delivery wrappers', () => {
 

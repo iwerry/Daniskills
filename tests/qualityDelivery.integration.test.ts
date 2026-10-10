@@ -39,6 +39,36 @@ describe('sequence continuity editorial intent', () => {
     expect(sequenceContinuity([shotA, shotB])).toHaveLength(issues.length);
   });
 
+  it('flags a prop state change without explicit causal evidence', () => {
+    const shotB = { ...shotA, id: 'B', prop_state: { case: 'open' } };
+    const issues = continuityCheck(shotA, shotB);
+    expect(issues.some(issue => issue.check === 'unexplained state transition')).toBe(true);
+  });
+
+  it('accepts a state transition with a cause and warns when no acting beat is linked', () => {
+    const shotB = {
+      ...shotA, id: 'B', prop_state: { case: 'open' },
+      propTransitions: [{ prop: 'case', from: 'closed', to: 'open', cause: 'Mara opens the latch' }]
+    };
+    const issues = continuityCheck(shotA, shotB);
+    expect(issues.some(issue => issue.check === 'unexplained state transition')).toBe(false);
+    expect(issues.some(issue => issue.check === 'causal traceability')).toBe(true);
+  });
+
+  it('accepts a causally explained state change linked to an acting beat', () => {
+    const shotB = {
+      ...shotA, id: 'B', prop_state: { case: 'open' },
+      propTransitions: [{
+        prop: 'case', from: 'closed', to: 'open',
+        cause: 'Mara opens the latch', beat: '00:02 Mara lifts the lid'
+      }]
+    };
+    const issues = continuityCheck(shotA, shotB);
+    expect(issues.some(issue => issue.check === 'unexplained state transition')).toBe(false);
+    expect(issues.some(issue => issue.check === 'causal traceability')).toBe(false);
+    expect(issues.some(issue => issue.check === 'prop position and state')).toBe(false);
+  });
+
   it('honors declared cross-cuts and axis breaks without suppressing feasibility vetoes', () => {
     const shotB = {
       ...shotA, id: 'B', axis: 'south', screen_direction: 'right' as const,

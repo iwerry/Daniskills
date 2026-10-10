@@ -1,3 +1,14 @@
+## 3.3.3 — Causal state traceability (2026-10-10)
+
+### Added
+- `ShotNode.propTransitions` records explicit prop-state changes with matching prior/next states, a causal explanation and an optional linked acting beat.
+- Continuity QA flags unexplained state transitions and warns when a stated cause lacks an acting-beat link.
+- Regression tests cover missing causes, cause-only records and fully traceable transitions.
+
+### Guardrails
+- Causal validation uses structured metadata; it does not infer unshown actions or object custody from prose.
+- A state change is considered explained only when prop name, from/to state and non-empty cause match the adjacent-shot state delta.
+
 ## 3.3.2 — Editorially aware continuity QA (2026-10-10)
 
 ### Added

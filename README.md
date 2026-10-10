@@ -379,7 +379,32 @@ Declare `ShotNode.editorialIntent` when a discontinuity is deliberate:
 - `match_cut`: do not flag a repeated focal relationship as a jump-cut risk.
 - `axis_break`: allow a deliberate axis/screen-direction crossing.
 
-The Feasibility Veto remains active regardless of editorial intent. Use explicit intent only when the cut is designed that way; the tool cannot infer editorial meaning from shot descriptions.
+The Feasibility Veto remains active regardless of editorial intent.
+
+### Causal state transitions for props
+
+When a prop's structured state changes between adjacent shots, QA checks whether the incoming shot provides a matching `propTransitions` record with the same prop, previous state, next state and a non-empty cause. A matching cause without a linked acting beat receives a traceability warning; a matching cause plus beat is accepted. Without a matching cause, QA emits an `unexplained state transition` warning.
+
+```ts
+{
+  id: 'B',
+  characters: ['Mara'],
+  location: 'warehouse',
+  props: ['case'],
+  prop_state: { case: 'open' },
+  propTransitions: [{
+    prop: 'case',
+    from: 'closed',
+    to: 'open',
+    cause: 'Mara opens the latch',
+    beat: '00:02 Mara lifts the lid'
+  }]
+}
+```
+
+This is structured validation, not automatic narrative understanding. Add transition evidence to the shot where the change becomes true. The checker does not infer custody transfers or unseen actions from prose.
+
+ Use explicit intent only when the cut is designed that way; the tool cannot infer editorial meaning from shot descriptions.
 
 ```ts
 const issues = sequenceContinuity([

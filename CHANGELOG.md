@@ -1,3 +1,15 @@
+## 3.3.4 — Sequence State Ledger (2026-10-10)
+
+### Added
+- `buildStateLedger(shots)` emits ordered prop-state snapshots and deterministic continuity findings.
+- `AssetGraph.stateLedger()` exposes sequence state validation directly from the asset graph.
+- Findings identify unexplained state changes, transition `from`/`to` mismatches, undeclared props, missing causes and missing acting-beat links.
+
+### Guardrails
+- Reads structured metadata only; no inferred actions or custody transfers.
+- `time_jump` and `montage` do not require adjacent state continuity.
+- Regression tests cover valid snapshots, mismatch diagnostics, intentional discontinuities and AssetGraph integration.
+
 ## 3.3.3 — Causal state traceability (2026-10-10)
 
 ### Added

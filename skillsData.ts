@@ -766,21 +766,51 @@ export interface ShotNode {
   id: string; characters: string[]; location?: string; props?: string[]; style?: string; engine?: string;
   fov_degrees?: number; screen_direction?: 'left' | 'right' | 'center'; axis?: string; light_direction?: string; time?: string; weather?: string;
   wardrobe?: Record<string, string>; prop_state?: Record<string, string>; micro_acting?: boolean;
+  /** Explicit editorial intent prevents continuity QA from treating designed discontinuities as accidental errors. */
+  editorialIntent?: 'continuity' | 'cross_cut' | 'time_jump' | 'montage' | 'match_cut' | 'axis_break';
 }
 export interface ContinuityIssue { level: 'CRITICAL' | 'WARNING'; check: string; between: [string, string]; message: string }
 export function continuityCheck(a: ShotNode, b: ShotNode): ContinuityIssue[] {
-  const out: ContinuityIssue[] = []; const between: [string, string] = [a.id, b.id]; const sameLoc = a.location && a.location === b.location;
-  if (sameLoc && a.axis && b.axis && a.axis !== b.axis) out.push({ level: 'WARNING', check: '180-degree rule / camera axis', between, message: `axis ${a.axis} → ${b.axis} inside the same location` });
-  if (sameLoc && a.screen_direction && b.screen_direction && a.screen_direction !== 'center' && b.screen_direction !== 'center' && a.screen_direction !== b.screen_direction) out.push({ level: 'WARNING', check: 'screen direction', between, message: `screen direction flips ${a.screen_direction} → ${b.screen_direction}` });
-  for (const c of a.characters.filter(c => b.characters.includes(c))) {
-    const wa = a.wardrobe?.[c], wb = b.wardrobe?.[c]; if (wa && wb && wa !== wb && a.time === b.time) out.push({ level: 'CRITICAL', check: 'wardrobe', between, message: `${c}: "${wa}" → "${wb}" with no time change` });
+  const out: ContinuityIssue[] = [];
+  const between: [string, string] = [a.id, b.id];
+  const sameLoc = Boolean(a.location && a.location === b.location);
+  const intent = b.editorialIntent ?? a.editorialIntent ?? 'continuity';
+  const crossCut = intent === 'cross_cut' || intent === 'montage';
+  const timeJump = intent === 'time_jump' || intent === 'montage';
+  const axisBreak = intent === 'axis_break' || intent === 'montage';
+  const matchCut = intent === 'match_cut' || intent === 'montage';
+
+  if (!crossCut && !axisBreak && sameLoc && a.axis && b.axis && a.axis !== b.axis) {
+    out.push({ level: 'WARNING', check: '180-degree rule / camera axis', between, message: `axis ${a.axis} → ${b.axis} inside the same location` });
   }
-  if (sameLoc && a.light_direction && b.light_direction && a.light_direction !== b.light_direction && a.time === b.time) out.push({ level: 'WARNING', check: 'light direction / sun position', between, message: `${a.light_direction} → ${b.light_direction}` });
-  if (sameLoc && a.time && b.time && a.time !== b.time) out.push({ level: 'WARNING', check: 'time of day', between, message: `${a.time} → ${b.time} in the same location` });
-  if (sameLoc && a.weather && b.weather && a.weather !== b.weather) out.push({ level: 'WARNING', check: 'weather', between, message: `${a.weather} → ${b.weather}` });
-  for (const p of (a.props ?? []).filter(p => (b.props ?? []).includes(p))) { const sa = a.prop_state?.[p], sb = b.prop_state?.[p]; if (sa && sb && sa !== sb) out.push({ level: 'WARNING', check: 'prop position and state', between, message: `${p}: ${sa} → ${sb}` }); }
-  if (a.fov_degrees && b.fov_degrees && Math.abs(a.fov_degrees - b.fov_degrees) < 12 && a.characters.join() === b.characters.join() && sameLoc) out.push({ level: 'WARNING', check: 'focal relationship', between, message: `FOV ${a.fov_degrees}° → ${b.fov_degrees}° is too similar (jump-cut feel); change size by 12°+ or the angle by 30°+` });
-  if (b.micro_acting && (b.fov_degrees ?? 0) >= 94) out.push({ level: 'CRITICAL', check: 'Feasibility Veto', between, message: 'micro-acting at FOV >= 94 degrees' });
+  if (!crossCut && !axisBreak && sameLoc && a.screen_direction && b.screen_direction &&
+      a.screen_direction !== 'center' && b.screen_direction !== 'center' && a.screen_direction !== b.screen_direction) {
+    out.push({ level: 'WARNING', check: 'screen direction', between, message: `screen direction flips ${a.screen_direction} → ${b.screen_direction}` });
+  }
+  if (!timeJump) {
+    for (const c of a.characters.filter(c => b.characters.includes(c))) {
+      const wa = a.wardrobe?.[c], wb = b.wardrobe?.[c];
+      if (wa && wb && wa !== wb && a.time === b.time) {
+        out.push({ level: 'CRITICAL', check: 'wardrobe', between, message: `${c}: "${wa}" → "${wb}" with no time change` });
+      }
+    }
+    if (sameLoc && a.light_direction && b.light_direction && a.light_direction !== b.light_direction && a.time === b.time) {
+      out.push({ level: 'WARNING', check: 'light direction / sun position', between, message: `${a.light_direction} → ${b.light_direction}` });
+    }
+    if (sameLoc && a.time && b.time && a.time !== b.time) out.push({ level: 'WARNING', check: 'time of day', between, message: `${a.time} → ${b.time} in the same location` });
+    if (sameLoc && a.weather && b.weather && a.weather !== b.weather) out.push({ level: 'WARNING', check: 'weather', between, message: `${a.weather} → ${b.weather}` });
+    for (const p of (a.props ?? []).filter(p => (b.props ?? []).includes(p))) {
+      const sa = a.prop_state?.[p], sb = b.prop_state?.[p];
+      if (sa && sb && sa !== sb) out.push({ level: 'WARNING', check: 'prop position and state', between, message: `${p}: ${sa} → ${sb}` });
+    }
+  }
+  if (!matchCut && a.fov_degrees && b.fov_degrees && Math.abs(a.fov_degrees - b.fov_degrees) < 12 &&
+      a.characters.join() === b.characters.join() && sameLoc) {
+    out.push({ level: 'WARNING', check: 'focal relationship', between, message: `FOV ${a.fov_degrees}° → ${b.fov_degrees}° is too similar (jump-cut feel); change size by 12°+ or the angle by 30°+` });
+  }
+  if (b.micro_acting && (b.fov_degrees ?? 0) >= 94) {
+    out.push({ level: 'CRITICAL', check: 'Feasibility Veto', between, message: 'micro-acting at FOV >= 94 degrees' });
+  }
   return out;
 }
 export function sequenceContinuity(shots: ShotNode[]) { return shots.slice(1).flatMap((s, i) => continuityCheck(shots[i], s)); }

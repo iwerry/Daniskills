@@ -912,6 +912,14 @@ export function buildStateLedger(shots: ShotNode[]): StateLedgerResult {
 
   return { snapshots, findings };
 }
+export interface RegenerationPlan {
+  asset: string;
+  rootShotId: string;
+  affectedShotIds: string[];
+  reason: StateLedgerFinding['code'];
+  scope: 'targeted';
+}
+
 export class AssetGraph {
   private shots = new Map<string, ShotNode>();
   add(...ss: ShotNode[]) { ss.forEach(s => this.shots.set(s.id, s)); return this; }
@@ -921,9 +929,32 @@ export class AssetGraph {
   }
   /** Build a state ledger from the graph's shots in insertion order. */
   stateLedger(): StateLedgerResult { return buildStateLedger([...this.shots.values()]); }
+  /**
+   * Produce a targeted regeneration set for a ledger finding. Starts at the prior
+   * shot when known and includes only shots that explicitly reference the affected prop.
+   * Sequence insertion order is preserved; unrelated shots are excluded.
+   */
+  regenerationPlanForFinding(finding: StateLedgerFinding): RegenerationPlan {
+    const all = [...this.shots.values()];
+    const anchorId = finding.previousShotId ?? finding.shotId;
+    const anchorIndex = Math.max(0, all.findIndex(shot => shot.id === anchorId));
+    const affectedShotIds = all.slice(anchorIndex).filter(shot =>
+      (shot.props ?? []).includes(finding.prop) ||
+      Object.prototype.hasOwnProperty.call(shot.prop_state ?? {}, finding.prop) ||
+      (shot.propTransitions ?? []).some(transition => transition.prop === finding.prop)
+    ).map(shot => shot.id);
+    if (!affectedShotIds.includes(finding.shotId)) affectedShotIds.push(finding.shotId);
+    return { asset: finding.prop, rootShotId: finding.shotId, affectedShotIds, reason: finding.code, scope: 'targeted' };
+  }
+  stateLedger(): StateLedgerResult { return buildStateLedger([...this.shots.values()]); }
   /** "If I change X, which shots must be regenerated?" */
   impactOf(asset: string): string[] {
-    return [...this.shots.values()].filter(s => s.characters.includes(asset) || s.location === asset || (s.props ?? []).includes(asset) || s.style === asset || s.engine === asset).map(s => s.id).sort();
+    return [...this.shots.values()].filter(s =>
+      s.characters.includes(asset) || s.location === asset || (s.props ?? []).includes(asset) ||
+      Object.prototype.hasOwnProperty.call(s.prop_state ?? {}, asset) ||
+      (s.propTransitions ?? []).some(transition => transition.prop === asset) ||
+      s.style === asset || s.engine === asset
+    ).map(s => s.id).sort();
   }
 }
 

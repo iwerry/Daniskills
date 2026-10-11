@@ -114,6 +114,29 @@ describe('sequence continuity editorial intent', () => {
     });
   });
 
+  it('classifies regeneration plans without triggering renders', () => {
+    const graph = new AssetGraph().add(
+      { id: 'A', characters: [], props: ['case'], prop_state: { case: 'closed' } },
+      { id: 'B', characters: [], props: ['case'], prop_state: { case: 'open' } }
+    );
+    const finding = graph.stateLedger().findings.find(item => item.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE');
+    expect(finding).toBeDefined();
+    const plan = graph.regenerationPlanForFinding(finding!);
+    expect(plan.recommendedAction).toBe('regenerate_visual');
+    expect(plan.scope).toBe('targeted');
+    expect(plan.affectedShotIds).toContain('B');
+  });
+
+  it('routes continuity findings to editorial review', () => {
+    const graph = new AssetGraph().add(
+      { id: 'A', characters: [], props: ['key'], prop_state: { key: 'held' } },
+      { id: 'B', characters: [], props: ['key'], prop_state: { key: 'missing' } }
+    );
+    const finding = graph.stateLedger().findings.find(item => item.code === 'STATE_LEDGER_FROM_MISMATCH' || item.code === 'STATE_LEDGER_TO_MISMATCH' || item.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE');
+    expect(finding).toBeDefined();
+    expect(graph.regenerationPlanForFinding(finding!).recommendedAction).toBe('review_continuity');
+  });
+
   it('includes state-only and transition-only references in asset impact', () => {
     const stateOnly = { id: 'state-only', characters: [], prop_state: { key: 'held' } };
     const transitionOnly = { id: 'transition-only', characters: [], propTransitions: [{ prop: 'key', from: 'held', to: 'dropped', cause: 'hand opens', beat: '00:01 fingers release' }] };

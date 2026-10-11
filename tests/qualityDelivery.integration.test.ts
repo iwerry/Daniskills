@@ -100,6 +100,27 @@ describe('sequence continuity editorial intent', () => {
     expect(ledger.findings.some(f => f.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE')).toBe(false);
   });
 
+  it('creates a targeted regeneration plan for a ledger finding', () => {
+    const shotB = { ...shotA, id: 'B', prop_state: { case: 'open' } };
+    const unrelated = { id: 'C', characters: ['Mara'], location: 'warehouse', props: ['phone'] };
+    const laterCase = { ...shotA, id: 'D', prop_state: { case: 'open' } };
+    const graph = new AssetGraph().add(shotA, shotB, unrelated, laterCase);
+    const finding = buildStateLedger([shotA, shotB]).findings.find(f => f.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE');
+    expect(finding).toBeDefined();
+    const plan = graph.regenerationPlanForFinding(finding!);
+    expect(plan).toEqual({
+      asset: 'case', rootShotId: 'B', affectedShotIds: ['A', 'B', 'D'],
+      reason: 'STATE_LEDGER_UNEXPLAINED_CHANGE', scope: 'targeted'
+    });
+  });
+
+  it('includes state-only and transition-only references in asset impact', () => {
+    const stateOnly = { id: 'state-only', characters: [], prop_state: { key: 'held' } };
+    const transitionOnly = { id: 'transition-only', characters: [], propTransitions: [{ prop: 'key', from: 'held', to: 'dropped', cause: 'hand opens', beat: '00:01 fingers release' }] };
+    const graph = new AssetGraph().add(stateOnly, transitionOnly);
+    expect(graph.impactOf('key')).toEqual(['state-only', 'transition-only']);
+  });
+
   it('exposes the same deterministic ledger through AssetGraph', () => {
     const shotB = { ...shotA, id: 'B', prop_state: { case: 'open' } };
     const graph = new AssetGraph().add(shotA, shotB);

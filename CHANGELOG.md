@@ -1,3 +1,14 @@
+## 3.3.5 — Targeted regeneration planning (2026-10-11)
+
+### Added
+- `AssetGraph.regenerationPlanForFinding(finding)` returns an ordered, targeted shot shortlist for a State Ledger finding.
+- `impactOf(asset)` now detects assets referenced only through `prop_state` or `propTransitions`.
+- Tests verify that dependent shots are retained while unrelated shots are excluded.
+
+### Guardrails
+- Planning only; no automatic rendering or destructive regeneration.
+- Uses explicit metadata and graph insertion order; does not infer unrecorded dependencies.
+
 ## 3.3.4 — Sequence State Ledger (2026-10-10)
 
 ### Added

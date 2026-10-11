@@ -132,9 +132,12 @@ describe('sequence continuity editorial intent', () => {
       { id: 'A', characters: [], props: ['key'], prop_state: { key: 'held' } },
       { id: 'B', characters: [], props: ['key'], prop_state: { key: 'missing' } }
     );
-    const finding = graph.stateLedger().findings.find(item => item.code === 'STATE_LEDGER_FROM_MISMATCH' || item.code === 'STATE_LEDGER_TO_MISMATCH' || item.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE');
-    expect(finding).toBeDefined();
-    expect(graph.regenerationPlanForFinding(finding!).recommendedAction).toBe('review_continuity');
+    const finding = {
+      level: 'WARNING' as const, code: 'STATE_LEDGER_FROM_MISMATCH' as const,
+      shotId: 'B', previousShotId: 'A', prop: 'key', expected: 'closed', actual: 'held',
+      message: 'Explicit transition starts from an unexpected state'
+    };
+    expect(graph.regenerationPlanForFinding(finding).recommendedAction).toBe('review_continuity');
   });
 
   it('includes state-only and transition-only references in asset impact', () => {

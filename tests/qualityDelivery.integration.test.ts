@@ -110,7 +110,7 @@ describe('sequence continuity editorial intent', () => {
     const plan = graph.regenerationPlanForFinding(finding!);
     expect(plan).toEqual({
       asset: 'case', rootShotId: 'B', affectedShotIds: ['A', 'B', 'D'],
-      reason: 'STATE_LEDGER_UNEXPLAINED_CHANGE', scope: 'targeted'
+      reason: 'STATE_LEDGER_UNEXPLAINED_CHANGE', recommendedAction: 'regenerate_visual', scope: 'targeted'
     });
   });
 

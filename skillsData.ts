@@ -917,6 +917,7 @@ export interface RegenerationPlan {
   rootShotId: string;
   affectedShotIds: string[];
   reason: StateLedgerFinding['code'];
+  recommendedAction: 'regenerate_visual' | 'review_continuity' | 'update_metadata';
   scope: 'targeted';
 }
 
@@ -944,9 +945,13 @@ export class AssetGraph {
       (shot.propTransitions ?? []).some(transition => transition.prop === finding.prop)
     ).map(shot => shot.id);
     if (!affectedShotIds.includes(finding.shotId)) affectedShotIds.push(finding.shotId);
-    return { asset: finding.prop, rootShotId: finding.shotId, affectedShotIds, reason: finding.code, scope: 'targeted' };
+    const recommendedAction: RegenerationPlan['recommendedAction'] = finding.code === 'STATE_LEDGER_UNEXPLAINED_CHANGE'
+      ? 'regenerate_visual'
+      : finding.code === 'STATE_LEDGER_PROP_UNDECLARED'
+        ? 'update_metadata'
+        : 'review_continuity';
+    return { asset: finding.prop, rootShotId: finding.shotId, affectedShotIds, reason: finding.code, recommendedAction, scope: 'targeted' };
   }
-  stateLedger(): StateLedgerResult { return buildStateLedger([...this.shots.values()]); }
   /** "If I change X, which shots must be regenerated?" */
   impactOf(asset: string): string[] {
     return [...this.shots.values()].filter(s =>

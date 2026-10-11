@@ -451,3 +451,8 @@ const graphLedger = new AssetGraph().add(...sequenceShots).stateLedger();
 // ledger.snapshots: [{ shotId, props }]
 // ledger.findings: stable codes + shot/prop IDs + expected/actual state
 ```
+
+
+## 🎯 Targeted regeneration plans
+
+`AssetGraph.regenerationPlanForFinding(finding)` converts a State Ledger finding into a deterministic, targeted regeneration plan. It starts at the previous shot when available and includes subsequent shots that explicitly reference the affected prop through `props`, `prop_state` or `propTransitions`, preserving sequence order and excluding unrelated shots. `impactOf(asset)` also recognizes state-only and transition-only references. This is a dependency shortlist, not an automatic render command: production systems can review the returned shot IDs before regenerating.

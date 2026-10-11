@@ -456,3 +456,13 @@ const graphLedger = new AssetGraph().add(...sequenceShots).stateLedger();
 ## 🎯 Targeted regeneration plans
 
 `AssetGraph.regenerationPlanForFinding(finding)` converts a State Ledger finding into a deterministic, targeted regeneration plan. It starts at the previous shot when available and includes subsequent shots that explicitly reference the affected prop through `props`, `prop_state` or `propTransitions`, preserving sequence order and excluding unrelated shots. `impactOf(asset)` also recognizes state-only and transition-only references. This is a dependency shortlist, not an automatic render command: production systems can review the returned shot IDs before regenerating.
+
+
+#### Recommended action and approval boundary
+
+Each targeted plan includes `recommendedAction`:
+- `regenerate_visual`: a prop-state change has no matching causal transition.
+- `review_continuity`: a state mismatch or missing causal/acting-beat evidence needs editorial review.
+- `update_metadata`: the affected prop is not declared in the shot metadata.
+
+These values are routing recommendations only. Daniskills does not render, replace, or publish shots automatically; the operator reviews the plan and explicitly starts any downstream generation.

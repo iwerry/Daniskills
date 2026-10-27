@@ -354,7 +354,7 @@ Requirement: `tsconfig` with `"resolveJsonModule": true` (Vite/Next already ship
 **Daniel Rodrigues** · Daniel Rodrigues
 *Daniskills 3.3.0 · Cinematic Intelligence Architecture · Color Grading DNA · Style Blending · G9 Brand Mode*
 
-Idea, architecture and creative content: all rights reserved to the author. Contributions and bug reports are welcome via *Issues*.
+Original project by Daniel Rodrigues. Licensed under the [MIT License](LICENSE) (Copyright © 2026 Daniel Rodrigues). Contributions and bug reports are welcome via *Issues*. Third-party materials, trademarks, and other intellectual property retain their respective rights.
 
 ---
 
